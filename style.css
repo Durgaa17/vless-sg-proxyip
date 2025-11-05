@@ -47,6 +47,7 @@ header h1 {
   align-items: center;
   flex-wrap: wrap;
   gap: 0.5rem;
+  position: relative;
 }
 
 .proxy-info {
@@ -59,6 +60,9 @@ header h1 {
   font-weight: bold;
   font-size: 1rem;
   color: #2c3e50;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .tag {
@@ -116,6 +120,47 @@ header h1 {
   min-width: 60px;
   text-align: center;
   color: #7f8c8d;
+}
+
+/* Working / Failed Badges */
+.proxy-card::before {
+  content: '';
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 8px;
+  vertical-align: middle;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.proxy-card.working::before {
+  content: 'Success';
+  background: #27ae60;
+  color: white;
+  width: 16px;
+  height: 16px;
+  line-height: 16px;
+  text-align: center;
+  border-radius: 50%;
+  font-weight: bold;
+  font-size: 10px;
+  opacity: 1;
+}
+
+.proxy-card.failed::before {
+  content: 'Failed';
+  background: #e74c3c;
+  color: white;
+  width: 16px;
+  height: 16px;
+  line-height: 16px;
+  text-align: center;
+  border-radius: 50%;
+  font-weight: bold;
+  font-size: 10px;
+  opacity: 1;
 }
 
 /* Loading & Footer */
