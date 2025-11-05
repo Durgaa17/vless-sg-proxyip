@@ -12,11 +12,11 @@ let updatedTime = 'Unknown';
 async function fetchProxies() {
   try {
     const response = await fetch(PROXIES_URL);
-    if (!response.ok) throw new Error('Failed to fetch proxies.txt');
+    if (!response.ok) throw new Error('Failed to load proxies.txt');
     const text = await response.text();
     parseProxies(text);
   } catch (err) {
-    proxyList.innerHTML = `<div class="loading">Error: ${err.message}<br>Check if <a href="${PROXIES_URL}" target="_blank">proxies.txt</a> exists.</div>`;
+    proxyList.innerHTML = `<div class="loading">Error: ${err.message}<br><a href="${PROXIES_URL}" target="_blank">Check source file</a></div>`;
     console.error(err);
   }
 }
@@ -54,7 +54,7 @@ function parseProxies(text) {
 
 function renderProxies() {
   if (proxies.length === 0) {
-    proxyList.innerHTML = `<div class="loading">No proxies found in file.</div>`;
+    proxyList.innerHTML = `<div class="loading">No proxies found.</div>`;
     return;
   }
 
@@ -62,7 +62,7 @@ function renderProxies() {
     <div class="proxy-card">
       <div class="proxy-info">
         <div class="proxy-ip">
-          <span></span> <!-- Badge placeholder -->
+          <span></span>
           ${proxy.ip}:${proxy.port}
         </div>
         <span class="tag ${proxy.country.toLowerCase()}">${proxy.country}</span>
@@ -85,6 +85,7 @@ function copyProxy(text) {
   });
 }
 
+// FINAL WORKING CHECK FUNCTION
 async function checkLatency(button, ip, port) {
   const resultEl = button.parentElement.querySelector('.result');
   const card = button.closest('.proxy-card');
@@ -94,32 +95,34 @@ async function checkLatency(button, ip, port) {
   card.classList.remove('working', 'failed');
 
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 10000);
+  const timeoutId = setTimeout(() => controller.abort(), 12000); // 12s max
 
   try {
-    const proxyStr = `${ip}:${port}`;
+    // EXACT FORMAT YOUR API EXPECTS
+    const proxyStr = `${ip}:${port}`; // e.g., 8.219.1.169:443
     const url = `${CHECK_API_URL}?proxyip=${encodeURIComponent(proxyStr)}`;
-    
-    const startTime = performance.now();
-    const response = await fetch(url, {
+
+    const start = performance.now();
+    const resp = await fetch(url, {
       signal: controller.signal,
       cache: 'no-store'
     });
-
     clearTimeout(timeoutId);
-    const endTime = performance.now();
-    const apiLatency = Math.round(endTime - startTime);
+    const end = performance.now();
+    const latency = Math.round(end - start);
 
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    const data = await response.json();
-    
-    if (data.success && apiLatency < 2000) {
-      resultEl.textContent = `${apiLatency}ms`;
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const data = await resp.json();
+
+    // API must return: { "success": true, "latency": 380 }
+    if (data.success === true && latency < 3000) {
+      resultEl.textContent = `${latency}ms`;
       resultEl.style.color = '#27ae60';
       card.classList.add('working');
     } else {
-      throw new Error('No success or too slow');
+      throw new Error(data.error || 'No success');
     }
+
   } catch (err) {
     clearTimeout(timeoutId);
     resultEl.textContent = 'Failed';
