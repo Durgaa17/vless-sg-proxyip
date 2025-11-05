@@ -1,4 +1,5 @@
 const PROXIES_URL = 'https://raw.githubusercontent.com/Durgaa17/cf-sg-proxies/refs/heads/main/proxies.txt';
+const CHECK_API_URL = 'https://cf-workers-checkproxyip.pages.dev/check';
 const proxyList = document.getElementById('proxy-list');
 const updatedSpan = document.getElementById('updated').querySelector('span');
 const sgCountEl = document.getElementById('sg-count');
@@ -11,10 +12,11 @@ let updatedTime = 'Unknown';
 async function fetchProxies() {
   try {
     const response = await fetch(PROXIES_URL);
+    if (!response.ok) throw new Error('Failed to fetch proxies.txt');
     const text = await response.text();
     parseProxies(text);
   } catch (err) {
-    proxyList.innerHTML = `<div class="loading">Failed to load proxies. Check internet or URL.</div>`;
+    proxyList.innerHTML = `<div class="loading">Error: ${err.message}<br>Check if <a href="${PROXIES_URL}" target="_blank">proxies.txt</a> exists.</div>`;
     console.error(err);
   }
 }
@@ -30,11 +32,11 @@ function parseProxies(text) {
 
     if (line.startsWith('# Updated:')) {
       updatedTime = line.replace('# Updated:', '').trim();
-    } else if (line.includes(':')) {
-      const parts = line.split(' : ');
+    } else if (line.includes(' : ')) {
+      const parts = line.split(' : ').map(p => p.trim());
       if (parts.length === 4) {
         const [ip, port, country, provider] = parts;
-        proxyData.push({ ip, port: parseInt(port), country, provider: provider.trim() });
+        proxyData.push({ ip, port: parseInt(port), country, provider });
         if (country === 'SG') sgCount++;
         if (country === 'MY') myCount++;
       }
@@ -52,14 +54,17 @@ function parseProxies(text) {
 
 function renderProxies() {
   if (proxies.length === 0) {
-    proxyList.innerHTML = `<div class="loading">No proxies found.</div>`;
+    proxyList.innerHTML = `<div class="loading">No proxies found in file.</div>`;
     return;
   }
 
   proxyList.innerHTML = proxies.map(proxy => `
     <div class="proxy-card">
       <div class="proxy-info">
-        <div class="proxy-ip">${proxy.ip}:${proxy.port}</div>
+        <div class="proxy-ip">
+          <span></span> <!-- Badge placeholder -->
+          ${proxy.ip}:${proxy.port}
+        </div>
         <span class="tag ${proxy.country.toLowerCase()}">${proxy.country}</span>
         <span class="provider">${escapeHtml(proxy.provider)}</span>
       </div>
@@ -82,36 +87,45 @@ function copyProxy(text) {
 
 async function checkLatency(button, ip, port) {
   const resultEl = button.parentElement.querySelector('.result');
+  const card = button.closest('.proxy-card');
   button.disabled = true;
-  resultEl.textContent = 'Testing...';
+  resultEl.innerHTML = 'Testing...';
   resultEl.style.color = '#f39c12';
+  card.classList.remove('working', 'failed');
 
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 7000);
-
-  const startTime = performance.now();
+  const timeoutId = setTimeout(() => controller.abort(), 10000);
 
   try {
-    const response = await fetch('http://httpbin.org/get', {
+    const proxyStr = `${ip}:${port}`;
+    const url = `${CHECK_API_URL}?proxyip=${encodeURIComponent(proxyStr)}`;
+    
+    const startTime = performance.now();
+    const response = await fetch(url, {
       signal: controller.signal,
       cache: 'no-store'
     });
 
     clearTimeout(timeoutId);
     const endTime = performance.now();
-    const latency = Math.round(endTime - startTime);
+    const apiLatency = Math.round(endTime - startTime);
 
-    if (response.ok) {
-      resultEl.textContent = `${latency}ms`;
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const data = await response.json();
+    
+    if (data.success && apiLatency < 2000) {
+      resultEl.textContent = `${apiLatency}ms`;
       resultEl.style.color = '#27ae60';
+      card.classList.add('working');
     } else {
-      throw new Error('Bad response');
+      throw new Error('No success or too slow');
     }
   } catch (err) {
     clearTimeout(timeoutId);
     resultEl.textContent = 'Failed';
     resultEl.style.color = '#e74c3c';
-    resultEl.title = 'Set browser proxy to this IP:Port first';
+    resultEl.title = err.name === 'AbortError' ? 'Timeout' : 'Error';
+    card.classList.add('failed');
   } finally {
     button.disabled = false;
   }
