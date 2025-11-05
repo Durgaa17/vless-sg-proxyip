@@ -5,7 +5,7 @@ update working Singapore proxies for proxyip
 
 Live proxy list with **latency check** and **copy** feature.
 
-**Live Site**: [https://yourusername.github.io/cf-sg-proxies-page](https://durgaa17.github.io/vless-sg-proxyip/)
+**Live Site**: [https://durgaa17.github.io/cf-sg-proxies-page](https://durgaa17.github.io/vless-sg-proxyip/)
 
 ---
 
