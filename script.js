@@ -1,5 +1,4 @@
 const PROXIES_URL = 'https://raw.githubusercontent.com/Durgaa17/cf-sg-proxies/refs/heads/main/proxies.txt';
-const CHECK_API_URL = 'https://cf-workers-checkproxyip.pages.dev/check';
 const proxyList = document.getElementById('proxy-list');
 const updatedSpan = document.getElementById('updated').querySelector('span');
 const sgCountEl = document.getElementById('sg-count');
@@ -31,11 +30,11 @@ function parseProxies(text) {
 
     if (line.startsWith('# Updated:')) {
       updatedTime = line.replace('# Updated:', '').trim();
-    } else if (line.includes(' : ')) {
+    } else if (line.includes(':')) {
       const parts = line.split(' : ');
       if (parts.length === 4) {
-        const [ip, port, country, provider] = parts.map(p => p.trim());
-        proxyData.push({ ip, port: parseInt(port), country, provider });
+        const [ip, port, country, provider] = parts;
+        proxyData.push({ ip, port: parseInt(port), country, provider: provider.trim() });
         if (country === 'SG') sgCount++;
         if (country === 'MY') myCount++;
       }
@@ -88,43 +87,31 @@ async function checkLatency(button, ip, port) {
   resultEl.style.color = '#f39c12';
 
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
+  const timeoutId = setTimeout(() => controller.abort(), 7000);
+
+  const startTime = performance.now();
 
   try {
-    const proxyStr = `${ip}:${port}`;
-    const url = `${CHECK_API_URL}?proxyip=${encodeURIComponent(proxyStr)}`;
-    
-    const startTime = performance.now();
-    const response = await fetch(url, {
+    const response = await fetch('http://httpbin.org/get', {
       signal: controller.signal,
       cache: 'no-store'
     });
 
     clearTimeout(timeoutId);
     const endTime = performance.now();
-    const apiLatency = Math.round(endTime - startTime);
+    const latency = Math.round(endTime - startTime);
 
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`);
-    }
-
-    const data = await response.json();
-    
-    if (data.success) {
-      // Assume API returns { success: true, ip: "detected_ip", ... } – adjust keys if needed
-      const detectedIp = data.ip || 'Unknown';
-      resultEl.textContent = `${apiLatency}ms (${detectedIp})`;
+    if (response.ok) {
+      resultEl.textContent = `${latency}ms`;
       resultEl.style.color = '#27ae60';
     } else {
-      resultEl.textContent = 'Failed';
-      resultEl.style.color = '#e74c3c';
-      resultEl.title = data.error || 'Proxy test failed';
+      throw new Error('Bad response');
     }
   } catch (err) {
     clearTimeout(timeoutId);
     resultEl.textContent = 'Failed';
     resultEl.style.color = '#e74c3c';
-    resultEl.title = err.name === 'AbortError' ? 'Timeout (slow proxy)' : err.message;
+    resultEl.title = 'Set browser proxy to this IP:Port first';
   } finally {
     button.disabled = false;
   }
